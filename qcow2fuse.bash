@@ -70,6 +70,11 @@ function qcow2_nbd_mount () {
     offset=$3
     size=$4
     
+    if [ "${mnt_opts[ro]+x}" ]; then
+	qemu_nbd_mode="--read-only"
+	nbdfuse_mode="--readonly"
+    fi
+
     image_opts="driver=raw"
     if [ "${offset}" -a "${size}" ]; then
 	image_opts+=",offset=${offset}"
@@ -77,10 +82,15 @@ function qcow2_nbd_mount () {
     fi
     image_opts+=",file.file.filename=${qcow_file}"
     image_opts+=",file.driver=qcow2"
-    ${QEMU_NBD} -k ${tmp_dir}/nbd.sock --image-opts "${image_opts}" 2>&1 | grep -v "Unexpected end-of-file before all bytes were read" &
+    ${QEMU_NBD} -k ${tmp_dir}/nbd.sock ${qemu_nbd_mode} --image-opts "${image_opts}" 2>&1 | grep -v "Unexpected end-of-file before all bytes were read" &
     
     mkdir ${tmp_dir}/nbd
-    ${NBDFUSE} ${tmp_dir}/nbd --unix ${tmp_dir}/nbd.sock &
+
+    until [ -e ${tmp_dir}/nbd.sock ]; do
+	sleep $delay
+    done
+
+    ${NBDFUSE} ${nbdfuse_mode} ${tmp_dir}/nbd --unix ${tmp_dir}/nbd.sock &
 
     until [ -f "${tmp_dir}/nbd/nbd" ]; do
 	sleep $delay
@@ -90,7 +100,7 @@ function qcow2_nbd_mount () {
 function qcow2_nbd_unmount () {
     tmp_dir=$1
 
-    until fusermount -u ${tmp_dir}/nbd; do
+    until fusermount -u ${tmp_dir}/nbd 2> /dev/null; do
 	sleep $delay
     done
     rmdir ${tmp_dir}/nbd
@@ -149,7 +159,16 @@ function part_table_type () {
 
 function qcow2_ext_mount () {
     tmp_dir=$1
-    ${FUSE2FS} ${tmp_dir}/nbd/nbd ${mnt_pt} -o fakeroot | grep -v "Writing to the journal is not supported" || true
+    
+    if [ "${mnt_opts[ro]+x}" ]; then
+	fuse2fs_mode="-o ro"
+    fi
+
+    if [ "${mnt_opts[fakeroot]+x}" ]; then
+	fuse2fs_fakeroot="-o fakeroot"
+    fi
+
+    ${FUSE2FS} ${tmp_dir}/nbd/nbd ${mnt_pt} ${fuse2fs_mode} ${fuse2fs_fakeroot} | grep -v "Writing to the journal is not supported" || true
 }
 
 function qcow2_ext_unmount () {
@@ -242,8 +261,9 @@ function qcow2_unmount () {
     rm -rf ${tmp_dir}
 }
 
+declare -A mnt_opts
 op=mount
-while getopts ":p:u:lh" opt; do
+while getopts ":p:u:o:lh" opt; do
     case ${opt} in
     p)
         part_id="$OPTARG"
@@ -252,6 +272,15 @@ while getopts ":p:u:lh" opt; do
         op=unmount
 	mnt_pt="$OPTARG"
         ;;
+    o)
+	mnt_opt="$OPTARG"
+	mnt_opt_re="([^=]+)=(.*)"
+	if [[ "$mnt_opt" =~ $mnt_opt_re ]]; then
+	    mnt_opts[${BASH_REMATCH[1]}]="${BASH_REMATCH[2]}"
+	else
+	    mnt_opts[$mnt_opt]=""
+	fi
+	;;
     l)
         op=list
         ;;
@@ -285,6 +314,7 @@ mount)
     if [ ${#mnt_pt_contents[@]} -ne 0 ]; then
 	die "Directory ${mnt_pt} not empty"
     fi
+    
     if [ "${part_id}" ]; then
 	qcow2_mount_partition "${qcow2_file}" "${part_id}" "${mnt_pt}"
     else
