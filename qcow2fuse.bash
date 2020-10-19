@@ -82,31 +82,32 @@ function qcow2_nbd_mount () {
     fi
     image_opts+=",file.file.filename=${qcow_file}"
     image_opts+=",file.driver=qcow2"
-    ${QEMU_NBD} -k ${tmp_dir}/nbd.sock ${qemu_nbd_mode} --image-opts "${image_opts}" 2>&1 | grep -v "Unexpected end-of-file before all bytes were read" &
     
     mkdir ${tmp_dir}/nbd
 
-    until [ -e ${tmp_dir}/nbd.sock ]; do
-	sleep $delay
-    done
+    ${NBDFUSE} ${nbdfuse_mode} ${tmp_dir}/nbd --socket-activation ${QEMU_NBD} ${qemu_nbd_mode} --image-opts "${image_opts}" 2>&1 | grep -v "Unexpected end-of-file before all bytes were read" &
 
-    ${NBDFUSE} ${nbdfuse_mode} ${tmp_dir}/nbd --unix ${tmp_dir}/nbd.sock &
-
+    retries=0
     until [ -f "${tmp_dir}/nbd/nbd" ]; do
 	sleep $delay
+	if ((++retries>10)); then
+	    return 1
+	fi
     done
 }
 
 function qcow2_nbd_unmount () {
     tmp_dir=$1
 
+    retries=0
     until fusermount -u ${tmp_dir}/nbd 2> /dev/null; do
 	sleep $delay
+	if ((++retries>10)); then
+	    warn "Can't unmount ${tmp_dir}/nbd"
+	fi
     done
+
     rmdir ${tmp_dir}/nbd
-    while [ -e ${tmp_dir}/nbd.sock ]; do
-        sleep $delay
-    done    
 }
 
 function get_part_params () {
@@ -168,14 +169,20 @@ function qcow2_ext_mount () {
 	fuse2fs_fakeroot="-o fakeroot"
     fi
 
-    ${FUSE2FS} ${tmp_dir}/nbd/nbd ${mnt_pt} ${fuse2fs_mode} ${fuse2fs_fakeroot} | grep -v "Writing to the journal is not supported" || true
+    ${FUSE2FS} ${tmp_dir}/nbd/nbd ${mnt_pt} ${fuse2fs_mode} ${fuse2fs_fakeroot} > /dev/null
+    # fuse2fs return code appears to be unreliable.  Check mountpoint instead
+    mountpoint -q ${mnt_pt}
 }
 
 function qcow2_ext_unmount () {
     mnt_pt="$1"
     fusermount -u "${mnt_pt}"
+    retries=0
     while findmnt "${mnt_pt}" > /dev/null; do
 	sleep $delay
+	if ((++retries>10)); then
+	    warn "Can't unmount ${mnt_pt}"
+	fi
     done
 }
 
@@ -196,6 +203,10 @@ function qcow2_mount_partition () {
     fi
     
     qcow2_nbd_mount "${tmp_dir}" "${qcow_file}"
+    if [ $? -ne 0 ]; then
+	rm -rf "${tmp_dir}"	
+	die "Timed out mounting ${qcow_file}"
+    fi
 
     params=$(get_part_params "${tmp_dir}/nbd/nbd" "${part_id}")
     if [ "${params}" ]; then
@@ -204,12 +215,21 @@ function qcow2_mount_partition () {
     else
 	qcow2_nbd_unmount "${tmp_dir}"
 	rm -rf "${tmp_dir}"
-	exit 1
+	die "Partition ${part_id} not found in ${qcow_file}"
     fi
  
     qcow2_nbd_mount "${tmp_dir}" "${qcow_file}" "${offset}" "${size}"
+    if [ $? -ne 0 ]; then
+	rm -rf "${tmp_dir}"	
+	die "Timed out mounting partition ${part_id} of ${qcow_file}"
+    fi
 
     qcow2_ext_mount "${tmp_dir}"
+    if [ $? -ne 0 ]; then
+	qcow2_nbd_unmount "${tmp_dir}"
+	rm -rf "${tmp_dir}"
+	die "Failed to mount partition ${part_id} to ${mnt_pt}"
+    fi
 }
 
 function qcow2_mount () {
@@ -228,19 +248,32 @@ function qcow2_mount () {
     fi
     
     qcow2_nbd_mount "${tmp_dir}" "${qcow_file}"
+    if [ $? -ne 0 ]; then
+	rm -rf "${tmp_dir}"	
+	die "Timed out mounting ${qcow_file}"
+    fi
 
     tbl_type=$(part_table_type)
     case $tbl_type in
     loop)
     ;;
     mbr|gpt)
+	qcow2_nbd_unmount "${tmp_dir}"
+	rm -rf "${tmp_dir}"
         die "Is a ${tbl_type} partitioned image"
     ;;
     *)
+	qcow2_nbd_unmount "${tmp_dir}"
+	rm -rf "${tmp_dir}"
 	die "Indeterminate partitioning"
     esac
 
     qcow2_ext_mount "${tmp_dir}"
+    if [ $? -ne 0 ]; then
+	qcow2_nbd_unmount "${tmp_dir}"
+	rm -rf "${tmp_dir}"
+	die "Failed to mount to ${mnt_pt}"
+    fi
 }
 
 function qcow2_unmount () {
@@ -255,9 +288,6 @@ function qcow2_unmount () {
 
     qcow2_nbd_unmount "${tmp_dir}"
 
-    while [ -e ${tmp_dir}/nbd.sock ]; do
-        sleep $delay
-    done
     rm -rf ${tmp_dir}
 }
 
