@@ -23,9 +23,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-QEMU_NBD="qemu-nbd"
-NBDFUSE="nbdfuse"
-FUSE2FS="fuse2fs"
+if [ -z "${QEMU_NBD}" ]; then
+    QEMU_NBD="qemu-nbd"
+fi
+if [ -z "${NBDFUSE}" ]; then
+    NBDFUSE="nbdfuse"
+fi
+if [ -z "${FUSE2FS}" ]; then
+    FUSE2FS="fuse2fs"
+fi
+if [ -z "${FUSERMOUNT}" ]; then
+    FUSERMOUNT="fusermount"
+fi
+if [ -z "${PARTED}" ]; then
+    PARTED="parted"
+fi
+if [ -z "${MOUNTPOINT}" ]; then
+    MOUNTPOINT="mountpoint"
+fi
 
 delay=0.2
 
@@ -98,7 +113,7 @@ function qcow2_nbd_unmount () {
     nbd_mnt=$1
 
     retries=0
-    until fusermount -u ${nbd_mnt} 2> /dev/null; do
+    until ${FUSERMOUNT} -u ${nbd_mnt} 2> /dev/null; do
 	sleep $delay
 	if ((++retries>10)); then
 	    warn "Can't unmount ${nbd_mnt}"
@@ -137,7 +152,7 @@ function get_part_params () {
 	if [ -z ${part_start} ]; then
 	    die "Partition ${part_id} not found"
 	fi
-    } < <(parted --machine --script ${nbd_mnt}/nbd unit B print)
+    } < <(${PARTED} --machine --script ${nbd_mnt}/nbd unit B print)
 
     echo "${part_start} ${part_size}"
 }
@@ -149,7 +164,7 @@ function part_table_type () {
 	# https://alioth-lists.debian.net/pipermail/parted-devel/2006-December/000573.html
 	read
 	IFS=: read path size type log_sec_sz phy_sec_sz tbl_type model_name
-    } < <(parted --machine --script ${nbd_mnt}/nbd unit B print)
+    } < <(${PARTED} --machine --script ${nbd_mnt}/nbd unit B print)
 
     echo "${tbl_type}"
 }
@@ -167,14 +182,14 @@ function qcow2_ext_mount () {
 
     ${FUSE2FS} ${nbd_mnt}/nbd ${mnt_pt} ${fuse2fs_mode} ${fuse2fs_fakeroot} > /dev/null
     # fuse2fs return code appears to be unreliable.  Check mountpoint instead
-    mountpoint -q ${mnt_pt}
+    ${MOUNTPOINT} -q ${mnt_pt}
 }
 
 function qcow2_ext_unmount () {
     mnt_pt="$1"
-    fusermount -u "${mnt_pt}"
+    ${FUSERMOUNT} -u "${mnt_pt}"
     retries=0
-    while findmnt "${mnt_pt}" > /dev/null; do
+    while ${MOUNTPOINT} -q "${mnt_pt}"; do
 	sleep $delay
 	if ((++retries>10)); then
 	    warn "Can't unmount ${mnt_pt}"
@@ -187,14 +202,14 @@ function qcow2_mount_partition () {
     part_id=$2
     mnt_pt=$3
     
-    if findmnt "${mnt_pt}" > /dev/null; then
+    if ${MOUNTPOINT} -q "${mnt_pt}"; then
 	die "Mount point ${mnt_pt} already in use"
     fi
 
     nbd_mnt=$(mnt_pt_hash_tmp "${mnt_pt}")
     mkdir -p "${nbd_mnt}"
 
-    if findmnt "${nbd_mnt}" > /dev/null; then
+    if ${MOUNTPOINT} -q "${nbd_mnt}"; then
 	die "${qcow_file} is already mounted"
     fi
     
@@ -232,14 +247,14 @@ function qcow2_mount () {
     qcow_file=$1
     mnt_pt=$2
     
-    if findmnt "${mnt_pt}" > /dev/null; then
+    if ${MOUNTPOINT} -q "${mnt_pt}"; then
 	die "Mount point ${mnt_pt} already in use"
     fi
 
     nbd_mnt=$(mnt_pt_hash_tmp "${mnt_pt}")
     mkdir -p "${nbd_mnt}"
     
-    if findmnt "${nbd_mnt}" > /dev/null; then
+    if ${MOUNTPOINT} -q "${nbd_mnt}"; then
 	die "${qcow_file} is already mounted"
     fi
     
