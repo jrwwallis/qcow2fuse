@@ -131,9 +131,19 @@ function get_part_params () {
 	IFS=: read path size type log_sec_sz phy_sec_sz tbl_type model_name
 	case $tbl_type in
 	loop)
-	    die "Not a partitioned image"
+	    if [ "${part_id}" ]; then
+		die "Not a partitioned image"
+	    else
+		echo "Partition table: None"
+		return
+	    fi
 	;;
 	mbr|gpt)
+	    if [ -z "${part_id}" ]; then
+		echo "Partition table: $tbl_type"
+		cat
+		return
+	    fi
 	;;
 	*)
 	    die "Indeterminate partitioning"
@@ -302,9 +312,32 @@ function qcow2_unmount () {
     rm -rf ${nbd_mnt}
 }
 
+function partition_list () {
+    qcow_file=$1
+
+    nbd_mnt=$(mnt_pt_hash_tmp "${mnt_pt}")
+    mkdir -p "${nbd_mnt}"
+    
+    if ${MOUNTPOINT} -q "${nbd_mnt}"; then
+	die "${qcow_file} is already mounted"
+    fi
+    
+    qcow2_nbd_mount "${nbd_mnt}" "${qcow_file}"
+    if [ $? -ne 0 ]; then
+	rm -rf "${nbd_mnt}"	
+	die "Timed out mounting ${qcow_file}"
+    fi
+
+    get_part_params "${nbd_mnt}"
+
+    qcow2_nbd_unmount "${nbd_mnt}"
+
+    rm -rf ${nbd_mnt}    
+}
+
 declare -A mnt_opts
 op=mount
-while getopts ":p:u:o:lh" opt; do
+while getopts ":p:u:o:l:h" opt; do
     case ${opt} in
     p)
         part_id="$OPTARG"
@@ -324,6 +357,7 @@ while getopts ":p:u:o:lh" opt; do
 	;;
     l)
         op=list
+	qcow2_file="$OPTARG"
         ;;
     h)
         usage
