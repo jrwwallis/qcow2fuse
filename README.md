@@ -12,7 +12,7 @@ Supports read-write and read-only modes.
 Supports .qcow2 files with backing files.
 
 qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nbd.8.en.html) and [nbdfuse](https://libguestfs.org/nbdfuse.1.html) first to mount the whole .qcow2 image to a temporary location.  It then checks the mounted image for partitions using [parted](https://www.gnu.org/software/parted/manual/parted.html):
-- if it is a non-partitioned image and no partition ID was specified with `-p`, qcow2fuse goes ahead and mounts the whole image to the specified mount point using [fuse2fs](http://manpages.ubuntu.com/manpages/bionic/man1/fuse2fs.1.html).
+- if it is a non-partitioned image and partition ID was not specified with `-p`, qcow2fuse goes ahead and mounts the whole image to the specified mount point using [fuse2fs](http://manpages.ubuntu.com/manpages/bionic/man1/fuse2fs.1.html).
 - if it is a partitioned image, and the specified partition ID (`-p`) matches an existing partition, then the offset and size of that partition are noted, then the initial qemu-nbd/nbdfuse mount is unmounted, then remounted using just the discovered offset and size to the temporary location.  This raw partition is then mounted to the specified mount point using fuse2fs.
 
 `-u` unmounts an existing mountpoint, as well as the qemu-nbd/nbdfuse mount at a temporary location.
@@ -42,3 +42,5 @@ sudo apt install fuse2fs
 </pre>
 
 If sudo access for apt is not available, these components are all buildable from source, without further dependencies.
+
+By default, the script will use the first instances of qemu-nbd, nbdfuse, fuse2fs, fusermount, parted and mountpoint binaries that it finds in the `$PATH` environment variable.  However these may be overriden by exporting `$QEMU_NBD`, `$NBDFUSE`, `$FUSE2FS`, `$FUSERMOUNT`, `$PARTED` and `$MOUNTPOINT` respective environment variables giving the required path to the appropriate binaries.
