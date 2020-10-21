@@ -61,7 +61,7 @@ function usage () {
 	output="${msg}
 "
     fi	
-    output+="Usage: qcow2fuse.bash [-p PART_ID] imagefile mountpoint
+    output+="Usage: qcow2fuse.bash [-o fakeroot] [-o ro] [-p PART_ID] imagefile mountpoint
 "
     output+="       qcow2fuse.bash -u mountpoint
 "
