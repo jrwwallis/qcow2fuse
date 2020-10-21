@@ -23,7 +23,7 @@ qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nb
 
 `-o fakeroot` allows non-privileged access to files in the disk image that are owned by user 0 (root)
 
-### Requirements
+### Dependencies
 
 1. FUSE.  FUSE support must be in the kernel, such that /dev/fuse has read-write permissions for all users.  Also libfuse.so and fusermount must be available
 2. qemu-nbd.  This binary exports a .qcow2 file as a read-write [NBD](https://en.wikipedia.org/wiki/Network_block_device), in this case via a unix socket
@@ -33,7 +33,7 @@ qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nb
   - It can provide output in machine-readable format
 5. fuse2fs.  This binary takes a raw disk image and FUSE mounts it to the filesystem.  In this case, the raw disk image is the one provided by the nbdfuse/qemu-nbd mount.
 
-The requirements are all easily satisfied in Ubuntu 20.04.1.  In particular, full FUSE support is already present, as is GNU parted.  qemu-nbd, nbdfuse and fuse2fs may all easily be installed with the apt package manager:
+The dependencies are all easily satisfied in Ubuntu 20.04.1.  In particular, full FUSE support is already present, as is GNU parted.  qemu-nbd, nbdfuse and fuse2fs may all easily be installed with the apt package manager:
 
 <pre>
 sudo apt install qemu-utils
@@ -41,6 +41,6 @@ sudo apt install nbdfuse
 sudo apt install fuse2fs
 </pre>
 
-If sudo access for apt is not available, these components are all buildable from source, without further dependencies.
+If sudo access for apt is not available, these dependencies are all buildable from source, without further dependencies.
 
 By default, the script will use the first instances of qemu-nbd, nbdfuse, fuse2fs, fusermount, parted and mountpoint binaries that it finds in the `$PATH` environment variable.  However these may be overriden by exporting `$QEMU_NBD`, `$NBDFUSE`, `$FUSE2FS`, `$FUSERMOUNT`, `$PARTED` and `$MOUNTPOINT` respective environment variables giving the required path to the appropriate binaries.
