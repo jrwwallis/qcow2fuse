@@ -2,18 +2,22 @@
 FUSE userspace mounting of .qcow2 images 
 
 <pre>
-Usage: qcow2fuse.bash [-p PART_ID] imagefile mountpoint
+Usage: qcow2fuse.bash [-o fakeroot] [-o ro] [-p PART_ID] imagefile mountpoint
        qcow2fuse.bash -u mountpoint
        qcow2fuse.bash -l imagefile
 </pre>
 
 qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nbd.8.en.html) and [nbdfuse](https://libguestfs.org/nbdfuse.1.html) first to mount the whole .qcow2 image to a temporary location.  It then checks the mounted image for partitions using [parted](https://www.gnu.org/software/parted/manual/parted.html):
-- if it is a non-partitioned image and no partition ID was specified with -p, qcow2fuse goes ahead and mounts the whole image to the specified mount point using [fuse2fs](http://manpages.ubuntu.com/manpages/bionic/man1/fuse2fs.1.html).
-- if it is a partitioned image, and the specified partition ID (-p) matches an existing partition, then the offset and size of that partition are noted, then the initial qemu-nbd/nbdfuse mount is unmounted, then remounted using just the discovered offset and size to the temporary location.  This raw partition is then mounted to the specified mount point using fuse2fs.
+- if it is a non-partitioned image and no partition ID was specified with `-p`, qcow2fuse goes ahead and mounts the whole image to the specified mount point using [fuse2fs](http://manpages.ubuntu.com/manpages/bionic/man1/fuse2fs.1.html).
+- if it is a partitioned image, and the specified partition ID (`-p`) matches an existing partition, then the offset and size of that partition are noted, then the initial qemu-nbd/nbdfuse mount is unmounted, then remounted using just the discovered offset and size to the temporary location.  This raw partition is then mounted to the specified mount point using fuse2fs.
 
--u unmounts an existing mountpoint, as well as the qemu-nbd/nbdfuse mount at a temporary location.
+`-u` unmounts an existing mountpoint, as well as the qemu-nbd/nbdfuse mount at a temporary location.
 
--l lists partitions, or lack thereof, discovered in the .qcow2 image.
+`-l` lists partitions, or lack thereof, discovered in the .qcow2 image.
+
+`-o ro` mounts the image read-only
+
+`-o fakeroot` allows non-privileged access to files in the disk image that are owned by user 0 (root)
 
 ### Requirements
 
