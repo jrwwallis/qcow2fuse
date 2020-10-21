@@ -25,7 +25,7 @@ qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nb
 
 ### Dependencies
 
-1. FUSE.  FUSE support must be in the kernel, such that `/dev/fuse` has read-write permissions for all users.  Also libfuse.so and fusermount must be available
+1. [FUSE](https://www.kernel.org/doc/html/latest/filesystems/fuse.html).  FUSE support must be in the kernel, such that `/dev/fuse` has read-write permissions for all users.  Also libfuse.so and fusermount must be available.
 2. qemu-nbd.  This binary exports a .qcow2 file as a read-write [NBD](https://en.wikipedia.org/wiki/Network_block_device), in this case via a unix socket
 3. nbdfuse.  This binary takes the NBD exported by qemu-nbd and FUSE mounts it to the filesystem
 4. parted.  parted was chosen over fdisk and gdisk for a couple of reasons:
@@ -33,7 +33,7 @@ qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nb
   - It can provide output in machine-readable format
 5. fuse2fs.  This binary takes a raw disk image and FUSE mounts it to the filesystem.  In this case, the raw disk image is the one provided by the nbdfuse/qemu-nbd mount.
 
-The dependencies are all easily satisfied in Ubuntu 20.04.1.  In particular, full FUSE support is already present, as is GNU parted.  qemu-nbd, nbdfuse and fuse2fs may all easily be installed with the apt package manager:
+The dependencies are all easily satisfied in [Ubuntu 20.04.1](https://wiki.ubuntu.com/FocalFossa/ReleaseNotes).  In particular, full FUSE support is already present, as is GNU parted.  qemu-nbd, nbdfuse and fuse2fs may all easily be installed with the apt package manager:
 
 <pre>
 sudo apt install qemu-utils
