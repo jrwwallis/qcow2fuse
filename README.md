@@ -25,7 +25,7 @@ qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nb
 
 ### Dependencies
 
-1. FUSE.  FUSE support must be in the kernel, such that /dev/fuse has read-write permissions for all users.  Also libfuse.so and fusermount must be available
+1. FUSE.  FUSE support must be in the kernel, such that `/dev/fuse` has read-write permissions for all users.  Also libfuse.so and fusermount must be available
 2. qemu-nbd.  This binary exports a .qcow2 file as a read-write [NBD](https://en.wikipedia.org/wiki/Network_block_device), in this case via a unix socket
 3. nbdfuse.  This binary takes the NBD exported by qemu-nbd and FUSE mounts it to the filesystem
 4. parted.  parted was chosen over fdisk and gdisk for a couple of reasons:
