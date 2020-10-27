@@ -61,7 +61,7 @@ function usage () {
 	output="${msg}
 "
     fi	
-    output+="Usage: qcow2fuse.bash [-o fakeroot] [-o ro] [-p PART_ID] imagefile mountpoint
+    output+="Usage: qcow2fuse.bash [-o fakeroot] [-o ro] [-o rawnbd] [-p PART_ID] imagefile mountpoint
 "
     output+="       qcow2fuse.bash -u mountpoint
 "
@@ -268,6 +268,14 @@ function qcow2_mount () {
 	die "${qcow_file} is already mounted"
     fi
     
+    if [ "${mnt_opts[rawnbd]+x}" ]; then
+	qcow2_nbd_mount "${mnt_pt}" "${qcow_file}"
+	if [ $? -ne 0 ]; then
+	    die "Timed out mounting ${qcow_file}"
+	fi
+	return
+    fi
+
     qcow2_nbd_mount "${nbd_mnt}" "${qcow_file}"
     if [ $? -ne 0 ]; then
 	rm -rf "${nbd_mnt}"	
@@ -307,7 +315,9 @@ function qcow2_unmount () {
     
     qcow2_ext_unmount "${mnt_pt}"
 
-    qcow2_nbd_unmount "${nbd_mnt}"
+    if [ -e "${nbd_mnt}/nbd" ]; then
+	qcow2_nbd_unmount "${nbd_mnt}"
+    fi
 
     rm -rf ${nbd_mnt}
 }
