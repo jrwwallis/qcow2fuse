@@ -2,7 +2,7 @@
 FUSE userspace mounting of .qcow2 images 
 
 <pre>
-Usage: qcow2fuse.bash [-o fakeroot] [-o ro] [-p PART_ID] imagefile mountpoint
+Usage: qcow2fuse.bash [-o fakeroot] [-o ro] [-o rawnbd] [-p PART_ID] imagefile mountpoint
        qcow2fuse.bash -u mountpoint
        qcow2fuse.bash -l imagefile
 </pre>
@@ -22,6 +22,8 @@ qcow2fuse uses [qemu-nbd](https://manpages.debian.org/testing/qemu-utils/qemu-nb
 `-o ro` mounts the image read-only
 
 `-o fakeroot` allows non-privileged access to files in the disk image that are owned by user 0 (root)
+
+`-o rawnbd` mounts the .qcow2 simply as a raw block device image file `nbd`.  This is useful for partition manipulation.
 
 ### Dependencies
 
