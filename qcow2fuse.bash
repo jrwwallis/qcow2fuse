@@ -239,6 +239,14 @@ function qcow2_mount_partition () {
 	die "Partition ${part_id} not found in ${qcow_file}"
     fi
  
+    if [ "${mnt_opts[rawnbd]+x}" ]; then
+	qcow2_nbd_mount "${mnt_pt}" "${qcow_file}" "${offset}" "${size}"
+	if [ $? -ne 0 ]; then
+	    die "Timed out mounting ${qcow_file}"
+	fi
+	return
+    fi
+
     qcow2_nbd_mount "${nbd_mnt}" "${qcow_file}" "${offset}" "${size}"
     if [ $? -ne 0 ]; then
 	rm -rf "${nbd_mnt}"	
