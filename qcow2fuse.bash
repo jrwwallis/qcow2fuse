@@ -117,6 +117,7 @@ function qcow2_nbd_unmount () {
 	sleep $delay
 	if ((++retries>10)); then
 	    warn "Can't unmount ${nbd_mnt}"
+            break
 	fi
     done
 }
@@ -203,7 +204,9 @@ function qcow2_ext_unmount () {
 	sleep $delay
 	if ((++retries>10)); then
 	    warn "Can't unmount ${mnt_pt}"
+            break
 	fi
+        ${FUSERMOUNT} -u "${mnt_pt}"
     done
 }
 
