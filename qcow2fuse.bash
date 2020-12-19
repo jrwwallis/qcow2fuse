@@ -32,6 +32,9 @@ fi
 if [ -z "${FUSE2FS}" ]; then
     FUSE2FS="fuse2fs"
 fi
+if [ -z "${NTFS3G}" ]; then
+    NTFS3G="ntfs-3g"
+fi
 if [ -z "${FUSERMOUNT}" ]; then
     FUSERMOUNT="fusermount"
 fi
@@ -97,8 +100,16 @@ function qcow2_nbd_mount () {
     fi
     image_opts+=",file.file.filename=${qcow_file}"
     image_opts+=",file.driver=qcow2"
-    
-    ${NBDFUSE} ${nbdfuse_mode} ${nbd_mnt} --socket-activation ${QEMU_NBD} ${qemu_nbd_mode} --image-opts "${image_opts}" 2>&1 | grep -v "Unexpected end-of-file before all bytes were read" &
+
+    grep -q ^user_allow_other /etc/fuse.conf
+    if [ $? -eq 0 ]; then
+        fuse_allow_other="-o allow_other"
+    fi
+
+    ${NBDFUSE} \
+        $fuse_allow_other ${nbdfuse_mode} ${nbd_mnt} \
+        --socket-activation ${QEMU_NBD} ${qemu_nbd_mode} \
+        --image-opts "${image_opts}" 2>&1 | grep -v "Unexpected end-of-file before all bytes were read" &
 
     retries=0
     until [ -f "${nbd_mnt}/nbd" ]; do
@@ -139,7 +150,7 @@ function get_part_params () {
 		return
 	    fi
 	;;
-	mbr|gpt)
+	mbr|gpt|msdos)
 	    if [ -z "${part_id}" ]; then
 		echo "Partition table: $tbl_type"
 		cat
@@ -147,11 +158,11 @@ function get_part_params () {
 	    fi
 	;;
 	*)
-	    die "Indeterminate partitioning"
+	    die "Indeterminate partitioning $tbl_type"
 	esac
 	while IFS=: read index start end size fs_type name flags; do
 	    if [  "${index}" == "${part_id}" ]; then
-		if [[ ${fs_type} =~ ext[234] ]]; then
+		if [[ ${fs_type} =~ ext[234] ]] || [[ ${fs_type} =~ ntfs.* ]]; then
 		    part_start=${start%B}
 		    part_size=${size%B}
 		    break
@@ -165,7 +176,7 @@ function get_part_params () {
 	fi
     } < <(${PARTED} --machine --script ${nbd_mnt}/nbd unit B print)
 
-    echo "${part_start} ${part_size}"
+    echo "${part_start} ${part_size}" "${fs_type}"
 }
 
 function part_table_type () {
@@ -196,7 +207,17 @@ function qcow2_ext_mount () {
     ${MOUNTPOINT} -q ${mnt_pt}
 }
 
-function qcow2_ext_unmount () {
+function qcow2_ntfs_mount () {
+    nbd_mnt=$1
+
+    if [ "${mnt_opts[ro]+x}" ]; then
+	ntfs3g_mode="-o ro"
+    fi
+
+    ${NTFS3G} ${ntfs3g_mode} ${nbd_mnt}/nbd ${mnt_pt} >/dev/null
+}
+
+function qcow2_fs_unmount () {
     mnt_pt="$1"
     ${FUSERMOUNT} -u "${mnt_pt}"
     retries=0
@@ -234,7 +255,7 @@ function qcow2_mount_partition () {
 
     params=$(get_part_params "${nbd_mnt}/nbd" "${part_id}")
     if [ "${params}" ]; then
-	read offset size <<< "${params}"
+	read offset size fstype <<< "${params}"
 	qcow2_nbd_unmount "${nbd_mnt}"
     else
 	qcow2_nbd_unmount "${nbd_mnt}"
@@ -256,7 +277,12 @@ function qcow2_mount_partition () {
 	die "Timed out mounting partition ${part_id} of ${qcow_file}"
     fi
 
-    qcow2_ext_mount "${nbd_mnt}"
+    if [[ ${fstype} =~ ntfs.* ]]; then
+        qcow2_ntfs_mount "${nbd_mnt}"
+    else
+        qcow2_ext_mount "${nbd_mnt}"
+    fi
+
     if [ $? -ne 0 ]; then
 	qcow2_nbd_unmount "${nbd_mnt}"
 	rm -rf "${nbd_mnt}"
@@ -324,7 +350,7 @@ function qcow2_unmount () {
 	die "No temp dir found for mount point"
     fi
     
-    qcow2_ext_unmount "${mnt_pt}"
+    qcow2_fs_unmount "${mnt_pt}"
 
     if [ -e "${nbd_mnt}/nbd" ]; then
 	qcow2_nbd_unmount "${nbd_mnt}"
