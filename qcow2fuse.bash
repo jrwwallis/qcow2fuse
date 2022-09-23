@@ -151,7 +151,7 @@ function get_part_params () {
 	esac
 	while IFS=: read index start end size fs_type name flags; do
 	    if [  "${index}" == "${part_id}" ]; then
-		if [[ ${fs_type} =~ ext[234] ]]; then
+		if [[ "${mnt_opts[rawnbd]+x}" || ${fs_type} =~ ext[234] ]]; then
 		    part_start=${start%B}
 		    part_size=${size%B}
 		    break
