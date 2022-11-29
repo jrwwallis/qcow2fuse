@@ -1,0 +1,14 @@
+cd boot/nxosv
+qemu-img resize -f qcow2 _nxq.nexus9500v64.10.1.0.28.aa485183.101.qcow2 +4G
+
+mkdir mnt
+~jwallis/bin/qcow2fuse.bash -o rawnbd _nxq.nexus9500v64.10.1.0.28.aa485183.101.qcow2 mnt
+echo "+4G" | /auto/xos-ha/util-linux-2.36/sbin/sfdisk --move-data -N7 mnt/nbd
+echo "+4G" | /auto/xos-ha/util-linux-2.36/sbin/sfdisk --move-data -N6 mnt/nbd
+echo "+4G" | /auto/xos-ha/util-linux-2.36/sbin/sfdisk --move-data -N5 mnt/nbd
+echo ", +" | /auto/xos-ha/util-linux-2.36/sbin/sfdisk -N4 mnt/nbd
+~jwallis/bin/qcow2fuse.bash -u mnt
+~jwallis/bin/qcow2fuse.bash -o rawnbd -p 4 _nxq.nexus9500v64.10.1.0.28.aa485183.101.qcow2 mnt
+e2fsck -y -f mnt/nbd
+resize2fs mnt/nbd
+~jwallis/bin/qcow2fuse.bash -u mnt
